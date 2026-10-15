@@ -1,92 +1,38 @@
 import os
-import asyncio
+import threading
+from flask import Flask
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# তোমার বটের ডাটা এখানে থাকবে (Render এর মেমোরিতে)
-users = {}
+# এটা Render কে বোকা বানানোর জন্য, যাতে 24 ঘন্টা অন মনে করে
+app_web = Flask(__name__)
 
+@app_web.route('/')
+def home():
+    return "Bot is Running 24/7 for @ffpanelhub12"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app_web.run(host='0.0.0.0', port=port)
+
+# তোমার বটের কমান্ড
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    args = context.args
+    await update.message.reply_text("✅ বট ২৪ ঘন্টা চালু আছে ভাই!\n\n@ffpanelhub12 এর জন্য রেডি।")
 
-    if user_id not in users:
-        users[user_id] = {"balance": 0, "referrals": 0, "referred_by": None}
-
-        # রেফার চেক
-        if args and len(args) > 0:
-            try:
-                referrer_id = int(args[0])
-                if referrer_id!= user_id and referrer_id in users:
-                    users[referrer_id]["balance"] += 2
-                    users[referrer_id]["referrals"] += 1
-                    users[user_id]["referred_by"] = referrer_id
-                    await context.bot.send_message(
-                        chat_id=referrer_id,
-                        text=f"🎉 অভিনন্দন! আপনার রেফারে একজন জয়েন করেছে। আপনি 2 টাকা পেয়েছেন!"
-                    )
-            except:
-                pass
-
-    bal = users[user_id]["balance"]
-    ref = users[user_id]["referrals"]
-    bot_username = (await context.bot.get_me()).username
-    link = f"https://t.me/{bot_username}?start={user_id}"
-
-    text = f"""
-👋 স্বাগতম!
-
-💰 আপনার ব্যালেন্স: {bal} টাকা
-👥 আপনার রেফার: {ref} জন
-
-🔗 আপনার রেফার লিঙ্ক:
-{link}
-
-প্রতি রেফারে 2 টাকা! 25 টাকা হলেই উইথড্র করতে পারবেন।
-
-কমান্ড:
- /balance - ব্যালেন্স দেখুন
- /refer - রেফার লিঙ্ক
- /withdraw - উইথড্র
-"""
-    await update.message.reply_text(text)
-
-async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in users:
-        users[user_id] = {"balance": 0, "referrals": 0, "referred_by": None}
-    await update.message.reply_text(f"💰 আপনার ব্যালেন্স: {users[user_id]['balance']} টাকা\n👥 রেফার: {users[user_id]['referrals']} জন")
-
-async def refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    bot_username = (await context.bot.get_me()).username
-    link = f"https://t.me/{bot_username}?start={user_id}"
-    await update.message.reply_text(f"🔗 আপনার রেফার লিঙ্ক:\n{link}\n\nপ্রতি রেফারে 2 টাকা!")
-
-async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in users:
-        users[user_id] = {"balance": 0, "referrals": 0, "referred_by": None}
-
-    bal = users[user_id]["balance"]
-    if bal < 25:
-        await update.message.reply_text(f"❌ উইথড্র করতে 25 টাকা লাগবে। আপনার আছে {bal} টাকা। আরও {25-bal} টাকা লাগবে।")
-    else:
-        await update.message.reply_text(f"✅ উইথড্র রিকোয়েস্ট পেয়েছি! {bal} টাকা।\n\nএডমিন শীঘ্রই পেমেন্ট করে দিবে। @admin এর সাথে যোগাযোগ করুন।")
-        users[user_id]["balance"] = 0
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("বট অনলাইন আছে 24/7")
 
 def main():
-    if not TOKEN:
-        print("ERROR: TELEGRAM_BOT_TOKEN not found!")
-        return
+    # ওয়েব সার্ভার আলাদা ভাবে চালু
+    threading.Thread(target=run_web).start()
+
+    # টেলিগ্রাম বট চালু
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("balance", balance))
-    app.add_handler(CommandHandler("refer", refer))
-    app.add_handler(CommandHandler("withdraw", withdraw))
-    print("Bot is running...")
+    app.add_handler(CommandHandler("help", help_cmd))
+    print("24/7 Bot Started...")
     app.run_polling()
 
 if __name__ == "__main__":
